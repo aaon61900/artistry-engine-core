@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
+import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -76,7 +78,13 @@ function Index() {
       toast.error("Add a prompt first ✦");
       return;
     }
+    if (!isHumanVerified()) {
+      clearHumanVerified();
+      toast("Please complete the human verification");
+      return;
+    }
     const id = crypto.randomUUID();
+
     const job: Job = {
       id,
       prompt: prompt.trim(),
