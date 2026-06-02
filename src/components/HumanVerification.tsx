@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Loader2, Check, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Check, ShieldCheck, RefreshCw, X } from "lucide-react";
 
 const STORAGE_KEY = "lumen:human-verified";
 const TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -35,10 +35,33 @@ export function clearHumanVerified() {
   window.dispatchEvent(new Event("lumen:human-verified"));
 }
 
+type Phase = "idle" | "checking" | "challenge" | "done";
+
+const CHALLENGE_POOL = [
+  { label: "traffic lights", target: "🚦", decoys: ["🚗", "🛵", "🚕", "🚙", "🛣️", "🚧", "🛑", "🅿️"] },
+  { label: "bicycles", target: "🚲", decoys: ["🛴", "🛹", "🏍️", "🚗", "🚌", "🛼", "🚐", "🚜"] },
+  { label: "boats", target: "⛵", decoys: ["🚤", "🛶", "🏖️", "🐟", "🌊", "🦈", "🐳", "🏝️"] },
+  { label: "trees", target: "🌳", decoys: ["🌵", "🌲", "🌴", "🍄", "🌷", "🪨", "🏔️", "🪵"] },
+  { label: "stars", target: "⭐", decoys: ["🌙", "☀️", "☁️", "🌈", "❄️", "⚡", "🪐", "🌍"] },
+];
+
+function buildChallenge() {
+  const c = CHALLENGE_POOL[Math.floor(Math.random() * CHALLENGE_POOL.length)];
+  const targetCount = 3 + Math.floor(Math.random() * 2); // 3 or 4
+  const tiles: { emoji: string; isTarget: boolean }[] = [];
+  for (let i = 0; i < targetCount; i++) tiles.push({ emoji: c.target, isTarget: true });
+  const decoys = [...c.decoys].sort(() => Math.random() - 0.5).slice(0, 9 - targetCount);
+  decoys.forEach((d) => tiles.push({ emoji: d, isTarget: false }));
+  return { label: c.label, tiles: tiles.sort(() => Math.random() - 0.5) };
+}
+
 export function HumanVerificationGate() {
   const [mounted, setMounted] = useState(false);
   const [verified, setVerified] = useState(true); // assume verified during SSR
-  const [state, setState] = useState<"idle" | "checking" | "done">("idle");
+  const [state, setState] = useState<Phase>("idle");
+  const [challenge, setChallenge] = useState(() => buildChallenge());
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -54,12 +77,41 @@ export function HumanVerificationGate() {
     if (state !== "idle") return;
     setState("checking");
     setTimeout(() => {
-      setState("done");
-      setTimeout(() => {
-        markHumanVerified();
-        setVerified(true);
-      }, 400);
-    }, 1200 + Math.random() * 600);
+      setChallenge(buildChallenge());
+      setSelected(new Set());
+      setError(null);
+      setState("challenge");
+    }, 900 + Math.random() * 500);
+  };
+
+  const toggleTile = (i: number) => {
+    setError(null);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  };
+
+  const newChallenge = () => {
+    setChallenge(buildChallenge());
+    setSelected(new Set());
+    setError(null);
+  };
+
+  const verify = () => {
+    const correct = challenge.tiles.every((t, i) => t.isTarget === selected.has(i));
+    if (!correct) {
+      setError("That didn't look right. Try again.");
+      newChallenge();
+      return;
+    }
+    setState("done");
+    setTimeout(() => {
+      markHumanVerified();
+      setVerified(true);
+    }, 500);
   };
 
   return (
