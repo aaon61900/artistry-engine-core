@@ -170,10 +170,11 @@ function Index() {
         <div className="grid lg:grid-cols-[1.1fr_1fr] gap-6">
           {/* Composer */}
           <Card className="p-6 border-border/60" style={{ background: "var(--gradient-card)", boxShadow: "var(--shadow-elevated)" }}>
-            <label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <label htmlFor="prompt-textarea" className="text-sm font-medium flex items-center gap-2 mb-2">
               <Wand2 className="size-4 text-primary" /> Describe your video
             </label>
             <Textarea
+              id="prompt-textarea"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="A golden retriever puppy surfing a tidal wave at sunset, slow motion, lens flare…"
@@ -231,10 +232,10 @@ function Index() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1.5 flex justify-between">
+                <label htmlFor="duration-slider" className="text-xs text-muted-foreground mb-1.5 flex justify-between">
                   <span>Duration</span><span className="text-foreground font-medium">{fmtDuration(duration[0])}</span>
                 </label>
-                <Slider value={duration} onValueChange={setDuration} min={2} max={32400} step={1} className="mt-3" />
+                <Slider id="duration-slider" value={duration} onValueChange={setDuration} min={2} max={32400} step={1} className="mt-3" />
               </div>
             </div>
 
@@ -306,6 +307,7 @@ function Index() {
                           }}
                         />
                         <button
+                          aria-label={playingId === job.id ? "Pause video" : "Play video"}
                           onClick={() => setPlayingId(playingId === job.id ? null : job.id)}
                           className="absolute inset-0 grid place-items-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
