@@ -144,35 +144,107 @@ export function HumanVerificationGate() {
           </div>
         </div>
 
-        <p className="text-sm text-muted-foreground mb-6">
-          This quick check protects Lumen from automated abuse. It only takes a
-          moment.
-        </p>
+        {state !== "challenge" && state !== "done" && (
+          <p className="text-sm text-muted-foreground mb-6">
+            This quick check protects Lumen from automated abuse. It only takes a
+            moment.
+          </p>
+        )}
 
-        <button
-          type="button"
-          onClick={handleCheck}
-          disabled={state !== "idle"}
-          aria-label="I am human"
-          className="w-full flex items-center gap-3 rounded-xl border border-border/60 bg-background/60 hover:bg-background/80 transition-colors p-4 text-left disabled:cursor-default"
-        >
-          <span className="relative size-6 shrink-0 rounded-md border-2 border-border grid place-items-center bg-background">
-            {state === "checking" && (
-              <Loader2 className="size-4 animate-spin text-primary" />
+        {(state === "idle" || state === "checking") && (
+          <button
+            type="button"
+            onClick={handleCheck}
+            disabled={state !== "idle"}
+            aria-label="I am human"
+            className="w-full flex items-center gap-3 rounded-xl border border-border/60 bg-background/60 hover:bg-background/80 transition-colors p-4 text-left disabled:cursor-default"
+          >
+            <span className="relative size-6 shrink-0 rounded-md border-2 border-border grid place-items-center bg-background">
+              {state === "checking" && (
+                <Loader2 className="size-4 animate-spin text-primary" />
+              )}
+            </span>
+            <span className="flex-1 text-sm font-medium">
+              {state === "idle" ? "I am human" : "Verifying…"}
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Lumen
+            </span>
+          </button>
+        )}
+
+        {state === "challenge" && (
+          <div>
+            <div className="rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 mb-4">
+              <div className="text-[11px] uppercase tracking-wider text-primary/80">
+                Select all squares with
+              </div>
+              <div className="text-base font-semibold capitalize">
+                {challenge.label}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {challenge.tiles.map((t, i) => {
+                const isSel = selected.has(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => toggleTile(i)}
+                    className={`relative aspect-square rounded-lg border text-4xl grid place-items-center transition-all ${
+                      isSel
+                        ? "border-primary bg-primary/15 scale-95"
+                        : "border-border/60 bg-background/60 hover:bg-background/80"
+                    }`}
+                  >
+                    <span>{t.emoji}</span>
+                    {isSel && (
+                      <span className="absolute top-1 right-1 size-4 rounded-full bg-primary grid place-items-center">
+                        <Check className="size-3 text-primary-foreground" strokeWidth={4} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-destructive mb-3">
+                <X className="size-3.5" /> {error}
+              </div>
             )}
-            {state === "done" && (
-              <Check className="size-4 text-primary" strokeWidth={3} />
-            )}
-          </span>
-          <span className="flex-1 text-sm font-medium">
-            {state === "idle" && "I am human"}
-            {state === "checking" && "Verifying…"}
-            {state === "done" && "Verified"}
-          </span>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Lumen
-          </span>
-        </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={newChallenge}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:bg-background/80 border border-border/60"
+                aria-label="New challenge"
+              >
+                <RefreshCw className="size-3.5" /> New
+              </button>
+              <button
+                type="button"
+                onClick={verify}
+                disabled={selected.size === 0}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--gradient-hero)" }}
+              >
+                Verify
+              </button>
+            </div>
+          </div>
+        )}
+
+        {state === "done" && (
+          <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
+            <span className="size-8 rounded-full bg-primary grid place-items-center">
+              <Check className="size-5 text-primary-foreground" strokeWidth={3} />
+            </span>
+            <div className="text-sm font-medium">Verified — welcome!</div>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-between text-[11px] text-muted-foreground">
           <span>Privacy · Terms</span>
