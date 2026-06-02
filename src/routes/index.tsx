@@ -49,6 +49,15 @@ type Job = {
   style: string;
 };
 
+function fmtDuration(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return `${m}m ${s}s`;
+}
+
 function Index() {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
@@ -223,9 +232,9 @@ function Index() {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1.5 flex justify-between">
-                  <span>Duration</span><span className="text-foreground font-medium">{duration[0]}s</span>
+                  <span>Duration</span><span className="text-foreground font-medium">{fmtDuration(duration[0])}</span>
                 </label>
-                <Slider value={duration} onValueChange={setDuration} min={2} max={15} step={1} className="mt-3" />
+                <Slider value={duration} onValueChange={setDuration} min={2} max={32400} step={1} className="mt-3" />
               </div>
             </div>
 
