@@ -78,7 +78,13 @@ function Index() {
       toast.error("Add a prompt first ✦");
       return;
     }
+    if (!isHumanVerified()) {
+      clearHumanVerified();
+      toast("Please complete the human verification");
+      return;
+    }
     const id = crypto.randomUUID();
+
     const job: Job = {
       id,
       prompt: prompt.trim(),
