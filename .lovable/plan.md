@@ -1,18 +1,32 @@
-## Problem
+## Goal
 
-`src/routes/index.tsx` keeps breaking under TanStack Router's code-splitter:
+Add a Cloudflare-style "Checking your browser…" human verification interstitial that appears on site load, plus re-gates the **Generate Video** action.
 
-1. With `const fmtDuration = ...` at module scope → splitter strips it → `fmtDuration is not defined` at SSR.
-2. After moving it inside `Index` → splitter mis-extracts fragments → `SyntaxError: 'return' outside of function (130:2)`.
+## UX
 
-Both are symptoms of the same thing: helpers declared as `const` aren't reliably retained by the splitter's AST walk, and large inline component bodies confuse it further.
+### 1. On site load — full-screen interstitial
+- Dark overlay covering the entire viewport, matching the existing neon/dark theme.
+- Centered card with:
+  - Lumen logo mark + "Verifying you are human" heading.
+  - A checkbox-style widget ("I am human") that, when clicked, shows a 1–2s spinner then a green check.
+  - Small print: "This step protects Lumen from automated abuse."
+- Once verified, the overlay fades out and the app becomes interactive.
+- Verification is remembered in `sessionStorage` so it doesn't re-prompt on every navigation within the tab.
 
-## Fix
+### 2. On "Generate Video" click
+- If verification has expired (older than 30 min) or was cleared, re-show the interstitial before queuing the render.
+- Otherwise generate normally.
 
-1. In `src/routes/index.tsx`:
-   - Move `fmtDuration` back to **module scope** but declare it as a **named function declaration** (`function fmtDuration(seconds: number) { ... }`) instead of `const`. Named function declarations are kept by the code-splitter's reference analysis.
-   - Leave the rest of `Index` untouched.
+## Implementation
 
-2. Verify the preview renders without SSR error and without the babel parse error.
+- New component `src/components/HumanVerification.tsx`:
+  - Self-contained overlay with the checkbox interaction.
+  - Calls an `onVerified()` callback.
+  - Uses semantic tokens from `src/styles.css` (no hardcoded colors).
+- New hook `src/hooks/useHumanVerification.ts`:
+  - Reads/writes `sessionStorage` key `lumen:human-verified` with timestamp.
+  - Exposes `{ verified, verify(), requireVerification() }`.
+- Wire into `src/routes/__root.tsx`: mount `<HumanVerification />` overlay when `!verified`, so it gates the whole app on load.
+- In `src/routes/index.tsx`: in `generate()`, call `requireVerification()` — if not verified, open the overlay instead of starting the render.
 
-No other files change. Plain UI/route fix — no schema, no server functions, no design changes.
+Pure client-side — no backend, no third-party keys, no schema changes. This is a UX deterrent, not a cryptographic bot defense (real bot defense would need Turnstile/reCAPTCHA + server verification, which we can layer on later if needed).
