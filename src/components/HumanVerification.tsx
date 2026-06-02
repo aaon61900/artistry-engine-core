@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Check, ShieldCheck, RefreshCw, X } from "lucide-react";
 
 const STORAGE_KEY = "lumen:human-verified";
