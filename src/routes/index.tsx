@@ -48,9 +48,9 @@ type Job = {
   aspect: string;
   style: string;
 };
-
-
+function Index() {
   const fmtDuration = (seconds: number) => {
+
     if (seconds < 60) return `${seconds}s`;
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
