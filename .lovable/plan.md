@@ -1,27 +1,18 @@
-## Goal
-Add a contact/support form to the video generator site that sends an email when a visitor submits it, using Lovable's built-in email infrastructure (no third-party API key needed).
+## Problem
 
-## What you'll get
-- A "Contact" section/page with fields: Name, Email, Message
-- On submit:
-  - Submission saved to the database (so nothing is lost)
-  - Confirmation email sent to the visitor ("Thanks, we got your message")
-  - Notification email sent to you (the site owner) with the submission details
-- A branded `/unsubscribe` page (required by the email system)
+`src/routes/index.tsx` keeps breaking under TanStack Router's code-splitter:
 
-## Steps
-1. Enable Lovable Cloud (needed for database + email queue)
-2. Set up your sender email domain (one-click flow; uses `notify.<yourdomain>` or a Lovable default)
-3. Provision email infrastructure (queues, suppression list, cron dispatcher)
-4. Scaffold transactional email server routes + two React Email templates:
-   - `contact-confirmation` → sent to visitor
-   - `contact-notification` → sent to you
-5. Create `contact_submissions` table with RLS (public insert allowed, read restricted)
-6. Add a public server route `/api/public/contact` that validates input (Zod), inserts the row, and triggers both emails
-7. Add a Contact form UI on the homepage (matches the existing dark/neon design)
-8. Add `/unsubscribe` page
+1. With `const fmtDuration = ...` at module scope → splitter strips it → `fmtDuration is not defined` at SSR.
+2. After moving it inside `Index` → splitter mis-extracts fragments → `SyntaxError: 'return' outside of function (130:2)`.
 
-## One thing I need from you
-What email address should receive the contact notifications? (e.g. your personal/business inbox)
+Both are symptoms of the same thing: helpers declared as `const` aren't reliably retained by the splitter's AST walk, and large inline component bodies confuse it further.
 
-If you don't specify, I'll use a placeholder you can edit later.
+## Fix
+
+1. In `src/routes/index.tsx`:
+   - Move `fmtDuration` back to **module scope** but declare it as a **named function declaration** (`function fmtDuration(seconds: number) { ... }`) instead of `const`. Named function declarations are kept by the code-splitter's reference analysis.
+   - Leave the rest of `Index` untouched.
+
+2. Verify the preview renders without SSR error and without the babel parse error.
+
+No other files change. Plain UI/route fix — no schema, no server functions, no design changes.
