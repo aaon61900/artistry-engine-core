@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
 import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
+import { generateVideo } from "@/lib/video.functions";
 
 
 export const Route = createFileRoute("/")({
@@ -60,7 +62,7 @@ function fmtDuration(seconds: number) {
 }
 
 function Index() {
-
+  const generateVideoFn = useServerFn(generateVideo);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
@@ -73,7 +75,7 @@ function Index() {
   const aspectClass = (a: string) =>
     a === "9:16" ? "aspect-[9/16]" : a === "1:1" ? "aspect-square" : a === "4:3" ? "aspect-[4/3]" : "aspect-video";
 
-  const generate = () => {
+  const generate = async () => {
     if (!prompt.trim()) {
       toast.error("Add a prompt first ✦");
       return;
@@ -84,39 +86,47 @@ function Index() {
       return;
     }
     const id = crypto.randomUUID();
+    const styledPrompt = style && style !== "cinematic" ? `${prompt.trim()}, ${style} style` : prompt.trim();
+    const apiDuration = Math.max(3, Math.min(12, duration[0]));
+    const apiResolution = quality === "4k" ? "1080p" : (quality as "720p" | "1080p");
 
     const job: Job = {
       id,
       prompt: prompt.trim(),
-      status: "queued",
-      progress: 0,
+      status: "rendering",
+      progress: 5,
       duration: duration[0],
       aspect,
       style,
     };
     setJobs((j) => [job, ...j]);
-    toast.success("Render queued — Lumen is dreaming…");
+    toast.success("Render started — this can take 1–5 min");
 
-    setTimeout(() => {
-      setJobs((j) => j.map((x) => (x.id === id ? { ...x, status: "rendering" } : x)));
-      const interval = setInterval(() => {
-        setJobs((j) => {
-          const target = j.find((x) => x.id === id);
-          if (!target) {
-            clearInterval(interval);
-            return j;
-          }
-          const next = Math.min(100, target.progress + Math.random() * 18 + 6);
-          if (next >= 100) {
-            clearInterval(interval);
-            const url = SAMPLE_VIDEOS[Math.floor(Math.random() * SAMPLE_VIDEOS.length)];
-            toast.success("Video ready ✨");
-            return j.map((x) => (x.id === id ? { ...x, status: "done", progress: 100, url } : x));
-          }
-          return j.map((x) => (x.id === id ? { ...x, progress: next } : x));
-        });
-      }, 450);
-    }, 600);
+    const interval = setInterval(() => {
+      setJobs((j) =>
+        j.map((x) =>
+          x.id === id && x.status === "rendering" ? { ...x, progress: Math.min(92, x.progress + 1.5) } : x,
+        ),
+      );
+    }, 1500);
+
+    try {
+      const res = await generateVideoFn({
+        data: {
+          prompt: styledPrompt,
+          duration: apiDuration,
+          aspect: aspect as "16:9" | "9:16" | "1:1" | "4:3",
+          resolution: apiResolution,
+        },
+      });
+      clearInterval(interval);
+      setJobs((j) => j.map((x) => (x.id === id ? { ...x, status: "done", progress: 100, url: res.url } : x)));
+      toast.success("Video ready ✨");
+    } catch (e) {
+      clearInterval(interval);
+      setJobs((j) => j.filter((x) => x.id !== id));
+      toast.error(e instanceof Error ? e.message : "Generation failed");
+    }
   };
 
   const reroll = (job: Job) => {
