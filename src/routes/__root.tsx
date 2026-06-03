@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { HumanVerificationGate } from "../components/HumanVerification";
+import { installCodeRepairer } from "../lib/code-repairer";
 
 
 function NotFoundComponent() {
@@ -122,6 +123,10 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    installCodeRepairer();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
@@ -129,5 +134,4 @@ function RootComponent() {
       <HumanVerificationGate />
     </QueryClientProvider>
   );
-
 }
