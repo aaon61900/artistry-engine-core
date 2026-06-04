@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/replicate/v1";
-// Fast image-to-video isn't needed — use a text-to-video model.
 const MODEL = "bytedance/seedance-1-lite";
 
 const Input = z.object({
@@ -12,13 +12,47 @@ const Input = z.object({
   resolution: z.enum(["480p", "720p", "1080p"]).default("1080p"),
 });
 
+const GENERIC_ERROR = "Video generation failed. Please try again.";
+
+// Best-effort same-origin guard. Prevents trivial cross-origin scripted abuse
+// of the server-function RPC. Not a substitute for real auth/CAPTCHA, but a
+// cheap mitigation while the app is unauthenticated.
+function assertSameOrigin() {
+  try {
+    const req = getRequest();
+    if (!req) return;
+    const origin = req.headers.get("origin") ?? "";
+    const referer = req.headers.get("referer") ?? "";
+    const host = req.headers.get("host") ?? "";
+    if (!host) return;
+    const ok = (u: string) => {
+      if (!u) return false;
+      try {
+        return new URL(u).host === host;
+      } catch {
+        return false;
+      }
+    };
+    if (!ok(origin) && !ok(referer)) {
+      throw new Error("Forbidden");
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === "Forbidden") throw e;
+    // ignore best-effort errors
+  }
+}
+
 export const generateVideo = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => {
+    assertSameOrigin();
+
     const lovableKey = process.env.LOVABLE_API_KEY;
     const replicateKey = process.env.REPLICATE_API_KEY;
-    if (!lovableKey) throw new Error("LOVABLE_API_KEY is not configured");
-    if (!replicateKey) throw new Error("REPLICATE_API_KEY is not configured");
+    if (!lovableKey || !replicateKey) {
+      console.error("[generateVideo] Missing API key configuration");
+      throw new Error(GENERIC_ERROR);
+    }
 
     const headers = {
       Authorization: `Bearer ${lovableKey}`,
@@ -39,13 +73,13 @@ export const generateVideo = createServerFn({ method: "POST" })
       }),
     });
     if (!createRes.ok) {
-      const t = await createRes.text();
-      throw new Error(`Replicate create failed ${createRes.status}: ${t}`);
+      const t = await createRes.text().catch(() => "");
+      console.error(`[generateVideo] gateway create failed ${createRes.status}: ${t}`);
+      throw new Error(GENERIC_ERROR);
     }
     const pred = (await createRes.json()) as { id: string };
     const id = pred.id;
 
-    // Poll up to ~10 minutes
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, i < 5 ? 3000 : 5000));
       const r = await fetch(`${GATEWAY}/predictions/${id}`, {
@@ -55,12 +89,17 @@ export const generateVideo = createServerFn({ method: "POST" })
       const j = (await r.json()) as { status: string; output?: unknown; error?: string };
       if (j.status === "succeeded") {
         const out = Array.isArray(j.output) ? j.output[0] : j.output;
-        if (typeof out !== "string") throw new Error("No video URL in output");
+        if (typeof out !== "string") {
+          console.error("[generateVideo] missing output URL", j);
+          throw new Error(GENERIC_ERROR);
+        }
         return { url: out, id };
       }
       if (j.status === "failed" || j.status === "canceled") {
-        throw new Error(`Replicate ${j.status}: ${j.error ?? "unknown error"}`);
+        console.error(`[generateVideo] ${j.status}: ${j.error ?? "unknown"}`);
+        throw new Error(GENERIC_ERROR);
       }
     }
-    throw new Error("Video generation timed out");
+    console.error("[generateVideo] timed out");
+    throw new Error(GENERIC_ERROR);
   });
