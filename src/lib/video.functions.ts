@@ -83,7 +83,7 @@ export const generateVideo = createServerFn({ method: "POST" })
     assertSameOrigin();
 
     const lovableKey = process.env.LOVABLE_API_KEY;
-    const replicateKey = process.env.REPLICATE_API_KEY;
+    const replicateKey = process.env.LOVABLE_CONNECTOR_REPLICATE_API_KEY ?? process.env.REPLICATE_API_KEY;
     if (!lovableKey || !replicateKey) {
       console.error("[generateVideo] Missing API key configuration");
       throw new Error(GENERIC_ERROR);
