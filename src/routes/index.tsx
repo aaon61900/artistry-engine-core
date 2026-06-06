@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
 import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
-import { generateVideo } from "@/lib/video.functions";
+import { generateVideo, getVideoDownloadUrl } from "@/lib/video.functions";
 
 
 export const Route = createFileRoute("/")({
@@ -48,6 +48,7 @@ type Job = {
   status: "queued" | "rendering" | "done";
   progress: number;
   url?: string;
+  storagePath?: string;
   duration: number;
   aspect: string;
   style: string;
@@ -63,6 +64,7 @@ function fmtDuration(seconds: number) {
 
 function Index() {
   const generateVideoFn = useServerFn(generateVideo);
+  const getVideoDownloadUrlFn = useServerFn(getVideoDownloadUrl);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
@@ -120,7 +122,11 @@ function Index() {
         },
       });
       clearInterval(interval);
-      setJobs((j) => j.map((x) => (x.id === id ? { ...x, status: "done", progress: 100, url: res.url } : x)));
+      setJobs((j) =>
+        j.map((x) =>
+          x.id === id ? { ...x, status: "done", progress: 100, url: res.url, storagePath: res.storagePath } : x,
+        ),
+      );
       toast.success("Video ready ✨");
     } catch (e) {
       clearInterval(interval);
@@ -137,13 +143,29 @@ function Index() {
     toast("Settings restored — tweak & regenerate", { icon: "🎬" });
   };
 
-  const download = (job: Job) => {
+  const download = async (job: Job) => {
     if (!job.url) return;
-    const a = document.createElement("a");
-    a.href = job.url;
-    a.download = `lumen-${job.id.slice(0, 8)}.mp4`;
-    a.click();
-    toast.success("Download started");
+
+    try {
+      const signed = job.storagePath
+        ? await getVideoDownloadUrlFn({ data: { storagePath: job.storagePath } })
+        : { url: job.url };
+      const response = await fetch(signed.url);
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `lumen-${job.id.slice(0, 8)}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("Download started");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Download failed");
+    }
   };
 
   return (
