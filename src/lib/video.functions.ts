@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { persistGeneratedVideo } from "./video-storage.server";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/replicate/v1";
 const MODEL = "bytedance/seedance-1-lite";
@@ -48,7 +49,7 @@ export const generateVideo = createServerFn({ method: "POST" })
     assertSameOrigin();
 
     const lovableKey = process.env.LOVABLE_API_KEY;
-    const replicateKey = process.env.REPLICATE_API_KEY;
+    const replicateKey = process.env.LOVABLE_CONNECTOR_REPLICATE_API_KEY ?? process.env.REPLICATE_API_KEY;
     if (!lovableKey || !replicateKey) {
       console.error("[generateVideo] Missing API key configuration");
       throw new Error(GENERIC_ERROR);
@@ -75,6 +76,12 @@ export const generateVideo = createServerFn({ method: "POST" })
     if (!createRes.ok) {
       const t = await createRes.text().catch(() => "");
       console.error(`[generateVideo] gateway create failed ${createRes.status}: ${t}`);
+      if (createRes.status === 402) {
+        throw new Error("Video generation needs provider credits before it can run. Add billing credit in Connectors, then try again.");
+      }
+      if (createRes.status === 429) {
+        throw new Error("Video generation is being rate-limited. Wait a few seconds, then try again.");
+      }
       throw new Error(GENERIC_ERROR);
     }
     const pred = (await createRes.json()) as { id: string };
@@ -93,7 +100,8 @@ export const generateVideo = createServerFn({ method: "POST" })
           console.error("[generateVideo] missing output URL", j);
           throw new Error(GENERIC_ERROR);
         }
-        return { url: out, id };
+        const saved = await persistGeneratedVideo(out, id);
+        return { url: saved.url, storagePath: saved.storagePath, id };
       }
       if (j.status === "failed" || j.status === "canceled") {
         console.error(`[generateVideo] ${j.status}: ${j.error ?? "unknown"}`);
