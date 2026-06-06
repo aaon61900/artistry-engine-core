@@ -14,10 +14,6 @@ const Input = z.object({
   resolution: z.enum(["480p", "720p", "1080p"]).default("1080p"),
 });
 
-const DownloadInput = z.object({
-  storagePath: z.string().min(1).max(500).regex(/^renders\/[a-zA-Z0-9._-]+\.mp4$/),
-});
-
 const GENERIC_ERROR = "Video generation failed. Please try again.";
 
 async function persistVideo(sourceUrl: string, predictionId: string) {
@@ -148,21 +144,4 @@ export const generateVideo = createServerFn({ method: "POST" })
     }
     console.error("[generateVideo] timed out");
     throw new Error(GENERIC_ERROR);
-  });
-
-export const getVideoDownloadUrl = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => DownloadInput.parse(data))
-  .handler(async ({ data }) => {
-    assertSameOrigin();
-
-    const { data: signed, error } = await supabaseAdmin.storage
-      .from(VIDEO_BUCKET)
-      .createSignedUrl(data.storagePath, 60 * 10);
-
-    if (error || !signed?.signedUrl) {
-      console.error("[getVideoDownloadUrl] signed URL failed", error);
-      throw new Error("Download link could not be created. Please try again.");
-    }
-
-    return { url: signed.signedUrl };
   });

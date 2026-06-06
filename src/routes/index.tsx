@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
 import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
-import { generateVideo, getVideoDownloadUrl } from "@/lib/video.functions";
+import { generateVideo } from "@/lib/video.functions";
 
 
 export const Route = createFileRoute("/")({
@@ -64,7 +64,6 @@ function fmtDuration(seconds: number) {
 
 function Index() {
   const generateVideoFn = useServerFn(generateVideo);
-  const getVideoDownloadUrlFn = useServerFn(getVideoDownloadUrl);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
@@ -143,29 +142,18 @@ function Index() {
     toast("Settings restored — tweak & regenerate", { icon: "🎬" });
   };
 
-  const download = async (job: Job) => {
+  const download = (job: Job) => {
     if (!job.url) return;
 
-    try {
-      const signed = job.storagePath
-        ? await getVideoDownloadUrlFn({ data: { storagePath: job.storagePath } })
-        : { url: job.url };
-      const response = await fetch(signed.url);
-      if (!response.ok) throw new Error("Download failed");
-
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = `lumen-${job.id.slice(0, 8)}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
-      toast.success("Download started");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Download failed");
-    }
+    const a = document.createElement("a");
+    a.href = job.storagePath
+      ? `/api/video-download?path=${encodeURIComponent(job.storagePath)}&name=${encodeURIComponent(`lumen-${job.id.slice(0, 8)}.mp4`)}`
+      : job.url;
+    a.download = `lumen-${job.id.slice(0, 8)}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast.success("Download started");
   };
 
   return (
