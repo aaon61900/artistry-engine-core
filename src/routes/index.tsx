@@ -72,6 +72,7 @@ function Index() {
   const [quality, setQuality] = useState("1080p");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const aspectClass = (a: string) =>
     a === "9:16" ? "aspect-[9/16]" : a === "1:1" ? "aspect-square" : a === "4:3" ? "aspect-[4/3]" : "aspect-video";
@@ -86,6 +87,11 @@ function Index() {
       toast("Please complete the human verification");
       return;
     }
+    if (isGenerating) {
+      toast("A render is already in progress");
+      return;
+    }
+    setIsGenerating(true);
     const id = crypto.randomUUID();
     const styledPrompt = style && style !== "cinematic" ? `${prompt.trim()}, ${style} style` : prompt.trim();
     const apiDuration = Math.max(3, Math.min(12, duration[0]));
@@ -131,6 +137,8 @@ function Index() {
       clearInterval(interval);
       setJobs((j) => j.filter((x) => x.id !== id));
       toast.error(e instanceof Error ? e.message : "Generation failed");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -270,11 +278,13 @@ function Index() {
 
             <Button
               onClick={generate}
+              disabled={isGenerating}
               size="lg"
               className="w-full mt-6 text-base font-semibold h-12 border-0"
               style={{ background: "var(--gradient-hero)", boxShadow: "var(--shadow-glow)" }}
             >
-              <Sparkles className="size-4 mr-2" /> Generate Video
+              {isGenerating ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Sparkles className="size-4 mr-2" />}
+              {isGenerating ? "Generating…" : "Generate Video"}
             </Button>
           </Card>
 
