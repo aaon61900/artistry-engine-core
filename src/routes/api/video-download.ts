@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const VIDEO_BUCKET = "generated-videos";
+import { downloadGeneratedVideo } from "@/lib/video-storage.server";
 
 const Query = z.object({
   path: z.string().min(1).max(500).regex(/^renders\/[a-zA-Z0-9._-]+\.mp4$/),
@@ -24,7 +22,7 @@ export const Route = createFileRoute("/api/video-download")({
           return new Response("Invalid video download link", { status: 400 });
         }
 
-        const { data, error } = await supabaseAdmin.storage.from(VIDEO_BUCKET).download(parsed.data.path);
+        const { data, error } = await downloadGeneratedVideo(parsed.data.path);
 
         if (error || !data) {
           console.error("[video-download] storage download failed", error);

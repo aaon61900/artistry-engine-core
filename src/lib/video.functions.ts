@@ -1,11 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { persistGeneratedVideo } from "./video-storage.server";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/replicate/v1";
 const MODEL = "bytedance/seedance-1-lite";
-const VIDEO_BUCKET = "generated-videos";
 
 const Input = z.object({
   prompt: z.string().min(3).max(2000),
@@ -15,39 +14,6 @@ const Input = z.object({
 });
 
 const GENERIC_ERROR = "Video generation failed. Please try again.";
-
-async function persistVideo(sourceUrl: string, predictionId: string) {
-  const videoRes = await fetch(sourceUrl);
-  if (!videoRes.ok) {
-    const body = await videoRes.text().catch(() => "");
-    console.error(`[generateVideo] output download failed ${videoRes.status}: ${body}`);
-    throw new Error("The generated video file could not be saved. Please try again.");
-  }
-
-  const contentType = videoRes.headers.get("content-type") || "video/mp4";
-  const storagePath = `renders/${predictionId}-${crypto.randomUUID()}.mp4`;
-  const videoBytes = new Uint8Array(await videoRes.arrayBuffer());
-
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from(VIDEO_BUCKET)
-    .upload(storagePath, videoBytes, { contentType, upsert: false });
-
-  if (uploadError) {
-    console.error("[generateVideo] storage upload failed", uploadError);
-    throw new Error("The generated video file could not be saved. Please try again.");
-  }
-
-  const { data, error: signedUrlError } = await supabaseAdmin.storage
-    .from(VIDEO_BUCKET)
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
-  if (signedUrlError || !data?.signedUrl) {
-    console.error("[generateVideo] signed URL failed", signedUrlError);
-    throw new Error("The generated video download link could not be created. Please try again.");
-  }
-
-  return { url: data.signedUrl, storagePath };
-}
 
 // Best-effort same-origin guard. Prevents trivial cross-origin scripted abuse
 // of the server-function RPC. Not a substitute for real auth/CAPTCHA, but a
@@ -134,7 +100,7 @@ export const generateVideo = createServerFn({ method: "POST" })
           console.error("[generateVideo] missing output URL", j);
           throw new Error(GENERIC_ERROR);
         }
-        const saved = await persistVideo(out, id);
+        const saved = await persistGeneratedVideo(out, id);
         return { url: saved.url, storagePath: saved.storagePath, id };
       }
       if (j.status === "failed" || j.status === "canceled") {
