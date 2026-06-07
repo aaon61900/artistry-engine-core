@@ -2,44 +2,51 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { persistGeneratedVideo } from "./video-storage.server";
+import { verifyChallenge } from "./human-challenge.server";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/replicate/v1";
 const MODEL = "bytedance/seedance-1-lite";
+
+const ChallengeSchema = z.object({
+  nonce: z.string().regex(/^[a-f0-9]{24}$/),
+  difficulty: z.number().int().min(1).max(8),
+  exp: z.number().int().positive(),
+  signature: z.string().min(1).max(128),
+  solution: z.string().min(1).max(32).regex(/^[a-zA-Z0-9]+$/),
+});
 
 const Input = z.object({
   prompt: z.string().min(3).max(2000),
   duration: z.number().int().min(3).max(12).default(5),
   aspect: z.enum(["16:9", "9:16", "1:1", "4:3"]).default("16:9"),
   resolution: z.enum(["480p", "720p", "1080p"]).default("1080p"),
+  challenge: ChallengeSchema,
 });
 
 const GENERIC_ERROR = "Video generation failed. Please try again.";
+const CHALLENGE_ERROR = "Human verification expired. Please refresh and try again.";
 
-// Best-effort same-origin guard. Prevents trivial cross-origin scripted abuse
-// of the server-function RPC. Not a substitute for real auth/CAPTCHA, but a
-// cheap mitigation while the app is unauthenticated.
+// Strict same-origin guard. Throws on any missing/mismatched header so a
+// missing host can't silently bypass the check. Combined with the
+// server-issued proof-of-work challenge, this provides a real (not UI-only)
+// server-side abuse mitigation for the unauthenticated generateVideo RPC.
 function assertSameOrigin() {
-  try {
-    const req = getRequest();
-    if (!req) return;
-    const origin = req.headers.get("origin") ?? "";
-    const referer = req.headers.get("referer") ?? "";
-    const host = req.headers.get("host") ?? "";
-    if (!host) return;
-    const ok = (u: string) => {
-      if (!u) return false;
-      try {
-        return new URL(u).host === host;
-      } catch {
-        return false;
-      }
-    };
-    if (!ok(origin) && !ok(referer)) {
-      throw new Error("Forbidden");
+  const req = getRequest();
+  if (!req) throw new Error("Forbidden");
+  const origin = req.headers.get("origin") ?? "";
+  const referer = req.headers.get("referer") ?? "";
+  const host = req.headers.get("host") ?? "";
+  if (!host) throw new Error("Forbidden");
+  const ok = (u: string) => {
+    if (!u) return false;
+    try {
+      return new URL(u).host === host;
+    } catch {
+      return false;
     }
-  } catch (e) {
-    if (e instanceof Error && e.message === "Forbidden") throw e;
-    // ignore best-effort errors
+  };
+  if (!ok(origin) && !ok(referer)) {
+    throw new Error("Forbidden");
   }
 }
 
