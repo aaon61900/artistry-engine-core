@@ -2,8 +2,37 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const VIDEO_BUCKET = "generated-videos";
 
+const ALLOWED_VIDEO_HOSTS = [
+  "replicate.delivery",
+  "pbxt.replicate.delivery",
+  "replicate.com",
+];
+
+function assertSafeVideoUrl(rawUrl: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("The generated video file could not be saved. Please try again.");
+  }
+  if (parsed.protocol !== "https:") {
+    console.error(`[generateVideo] rejected non-https output URL: ${parsed.protocol}`);
+    throw new Error("The generated video file could not be saved. Please try again.");
+  }
+  const host = parsed.hostname.toLowerCase();
+  const allowed = ALLOWED_VIDEO_HOSTS.some(
+    (h) => host === h || host.endsWith(`.${h}`),
+  );
+  if (!allowed) {
+    console.error(`[generateVideo] rejected output URL with untrusted host: ${host}`);
+    throw new Error("The generated video file could not be saved. Please try again.");
+  }
+  return parsed;
+}
+
 export async function persistGeneratedVideo(sourceUrl: string, predictionId: string) {
-  const videoRes = await fetch(sourceUrl);
+  const safeUrl = assertSafeVideoUrl(sourceUrl);
+  const videoRes = await fetch(safeUrl.toString(), { redirect: "error" });
   if (!videoRes.ok) {
     const body = await videoRes.text().catch(() => "");
     console.error(`[generateVideo] output download failed ${videoRes.status}: ${body}`);
