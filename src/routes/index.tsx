@@ -121,12 +121,15 @@ function Index() {
     }, 1500);
 
     try {
+      const issued = await issueHumanChallengeFn();
+      const solved = await solveChallenge(issued);
       const res = await generateVideoFn({
         data: {
           prompt: styledPrompt,
           duration: apiDuration,
           aspect: aspect as "16:9" | "9:16" | "1:1" | "4:3",
           resolution: apiResolution,
+          challenge: solved,
         },
       });
       clearInterval(interval);
