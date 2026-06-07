@@ -26,39 +26,21 @@ const Input = z.object({
 const GENERIC_ERROR = "Video generation failed. Please try again.";
 const CHALLENGE_ERROR = "Human verification expired. Please refresh and try again.";
 
-// Strict same-origin guard. Throws on any missing/mismatched header so a
-// missing host can't silently bypass the check. Combined with the
-// server-issued proof-of-work challenge, this provides a real (not UI-only)
-// server-side abuse mitigation for the unauthenticated generateVideo RPC.
-function assertSameOrigin() {
-  const req = getRequest();
-  if (!req) throw new Error("Forbidden");
-  const origin = req.headers.get("origin") ?? "";
-  const referer = req.headers.get("referer") ?? "";
-  const host = req.headers.get("host") ?? "";
-  if (!host) throw new Error("Forbidden");
-  const ok = (u: string) => {
-    if (!u) return false;
-    try {
-      return new URL(u).host === host;
-    } catch {
-      return false;
-    }
-  };
-  if (!ok(origin) && !ok(referer)) {
-    throw new Error("Forbidden");
-  }
-}
-
 export const generateVideo = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => {
-    assertSameOrigin();
-
+    // Real server-side abuse mitigation: a server-signed, time-limited
+    // proof-of-work challenge issued by `issueHumanChallenge`. The client
+    // must compute a PoW solution before this handler will spend provider
+    // credits. We do NOT rely on Origin/Referer headers — those are
+    // trivially spoofed by non-browser clients (curl, scripts, etc.) and
+    // would only provide a false sense of security.
     if (!verifyChallenge(data.challenge)) {
       console.warn("[generateVideo] rejected: invalid human-verification challenge");
       throw new Error(CHALLENGE_ERROR);
     }
+
+
 
 
 
