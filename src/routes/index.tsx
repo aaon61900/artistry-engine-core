@@ -12,6 +12,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
 import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
 import { generateVideo } from "@/lib/video.functions";
+import { issueHumanChallenge } from "@/lib/human-challenge.functions";
+import { solveChallenge } from "@/lib/human-challenge-client";
 
 
 export const Route = createFileRoute("/")({
