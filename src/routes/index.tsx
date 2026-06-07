@@ -66,6 +66,7 @@ function fmtDuration(seconds: number) {
 
 function Index() {
   const generateVideoFn = useServerFn(generateVideo);
+  const issueHumanChallengeFn = useServerFn(issueHumanChallenge);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
