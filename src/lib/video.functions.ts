@@ -55,6 +55,13 @@ export const generateVideo = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertSameOrigin();
 
+    if (!verifyChallenge(data.challenge)) {
+      console.warn("[generateVideo] rejected: invalid human-verification challenge");
+      throw new Error(CHALLENGE_ERROR);
+    }
+
+
+
     const lovableKey = process.env.LOVABLE_API_KEY;
     const replicateKey = process.env.LOVABLE_CONNECTOR_REPLICATE_API_KEY ?? process.env.REPLICATE_API_KEY;
     if (!lovableKey || !replicateKey) {
