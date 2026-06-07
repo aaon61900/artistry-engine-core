@@ -12,6 +12,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sparkles, Wand2, Download, Play, Pause, RotateCcw, Film, Zap, Image as ImageIcon, Loader2 } from "lucide-react";
 import { isHumanVerified, clearHumanVerified } from "@/components/HumanVerification";
 import { generateVideo } from "@/lib/video.functions";
+import { issueHumanChallenge } from "@/lib/human-challenge.functions";
+import { solveChallenge } from "@/lib/human-challenge-client";
 
 
 export const Route = createFileRoute("/")({
@@ -64,6 +66,7 @@ function fmtDuration(seconds: number) {
 
 function Index() {
   const generateVideoFn = useServerFn(generateVideo);
+  const issueHumanChallengeFn = useServerFn(issueHumanChallenge);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState([5]);
@@ -118,12 +121,15 @@ function Index() {
     }, 1500);
 
     try {
+      const issued = await issueHumanChallengeFn();
+      const solved = await solveChallenge(issued);
       const res = await generateVideoFn({
         data: {
           prompt: styledPrompt,
           duration: apiDuration,
           aspect: aspect as "16:9" | "9:16" | "1:1" | "4:3",
           resolution: apiResolution,
+          challenge: solved,
         },
       });
       clearInterval(interval);

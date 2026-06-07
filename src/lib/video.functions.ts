@@ -1,52 +1,48 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+
 import { z } from "zod";
 import { persistGeneratedVideo } from "./video-storage.server";
+import { verifyChallenge } from "./human-challenge.server";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/replicate/v1";
 const MODEL = "bytedance/seedance-1-lite";
+
+const ChallengeSchema = z.object({
+  nonce: z.string().regex(/^[a-f0-9]{24}$/),
+  difficulty: z.number().int().min(1).max(8),
+  exp: z.number().int().positive(),
+  signature: z.string().min(1).max(128),
+  solution: z.string().min(1).max(32).regex(/^[a-zA-Z0-9]+$/),
+});
 
 const Input = z.object({
   prompt: z.string().min(3).max(2000),
   duration: z.number().int().min(3).max(12).default(5),
   aspect: z.enum(["16:9", "9:16", "1:1", "4:3"]).default("16:9"),
   resolution: z.enum(["480p", "720p", "1080p"]).default("1080p"),
+  challenge: ChallengeSchema,
 });
 
 const GENERIC_ERROR = "Video generation failed. Please try again.";
-
-// Best-effort same-origin guard. Prevents trivial cross-origin scripted abuse
-// of the server-function RPC. Not a substitute for real auth/CAPTCHA, but a
-// cheap mitigation while the app is unauthenticated.
-function assertSameOrigin() {
-  try {
-    const req = getRequest();
-    if (!req) return;
-    const origin = req.headers.get("origin") ?? "";
-    const referer = req.headers.get("referer") ?? "";
-    const host = req.headers.get("host") ?? "";
-    if (!host) return;
-    const ok = (u: string) => {
-      if (!u) return false;
-      try {
-        return new URL(u).host === host;
-      } catch {
-        return false;
-      }
-    };
-    if (!ok(origin) && !ok(referer)) {
-      throw new Error("Forbidden");
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message === "Forbidden") throw e;
-    // ignore best-effort errors
-  }
-}
+const CHALLENGE_ERROR = "Human verification expired. Please refresh and try again.";
 
 export const generateVideo = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => {
-    assertSameOrigin();
+    // Real server-side abuse mitigation: a server-signed, time-limited
+    // proof-of-work challenge issued by `issueHumanChallenge`. The client
+    // must compute a PoW solution before this handler will spend provider
+    // credits. We do NOT rely on Origin/Referer headers — those are
+    // trivially spoofed by non-browser clients (curl, scripts, etc.) and
+    // would only provide a false sense of security.
+    if (!verifyChallenge(data.challenge)) {
+      console.warn("[generateVideo] rejected: invalid human-verification challenge");
+      throw new Error(CHALLENGE_ERROR);
+    }
+
+
+
+
 
     const lovableKey = process.env.LOVABLE_API_KEY;
     const replicateKey = process.env.LOVABLE_CONNECTOR_REPLICATE_API_KEY ?? process.env.REPLICATE_API_KEY;
