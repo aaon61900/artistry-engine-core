@@ -1,0 +1,7 @@
+# Lumen
+
+> Lumen is a cinematic AI video generator that turns text prompts into dynamic short videos.
+
+## Pages
+
+- [Home](/): Generate cinematic AI videos from text prompts.
