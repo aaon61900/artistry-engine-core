@@ -20,9 +20,28 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Lumen — AI Video Generator" },
-      { name: "description", content: "Generate cinematic AI videos from text prompts. Fast, simple, gorgeous." },
+      { name: "description", content: "Generate cinematic AI videos from text prompts with Lumen. Fast, simple, gorgeous." },
       { property: "og:title", content: "Lumen — AI Video Generator" },
-      { property: "og:description", content: "Generate cinematic AI videos from text prompts." },
+      { property: "og:description", content: "Generate cinematic AI videos from text prompts with Lumen." },
+      { property: "og:url", content: "https://artistry-engine-core.lovable.app/" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://artistry-engine-core.lovable.app/" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Lumen",
+          applicationCategory: "MultimediaApplication",
+          operatingSystem: "Web",
+          description: "Lumen is a cinematic AI video generator that turns text prompts into dynamic short videos.",
+          url: "https://artistry-engine-core.lovable.app/",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        }),
+      },
     ],
   }),
   component: Index,
